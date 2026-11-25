@@ -1,0 +1,356 @@
+
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="HUZEYF">
+<meta name="theme-color" content="#101114">
+<title>HUZEYF</title>
+
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101114;color:#eee;font-family:-apple-system,BlinkMacSystemFont,sans-serif;padding:18px;transition:.2s}
+body.light{background:#f3f3f3;color:#171717}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.logo{font-size:30px;font-weight:900;letter-spacing:3px}
+.small{font-size:11px;color:#999}
+button{background:#292a30;color:white;border:0;padding:12px;border-radius:10px;font-size:14px;cursor:pointer}
+.light button{background:#ddd;color:#111}
+input,select{width:100%;padding:13px;margin:6px 0;background:#202127;color:white;border:1px solid #383941;border-radius:10px;font-size:14px}
+.light input,.light select{background:white;color:#111}
+.panel{background:#191a1f;border:1px solid #303138;border-radius:16px;padding:15px;margin:14px 0}
+.light .panel{background:white;border-color:#ddd}
+h2{font-size:17px}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}
+.toolbar button{padding:9px 13px}
+#editor{min-height:250px;background:#111216;border:1px solid #393a42;border-radius:12px;padding:14px;outline:none;line-height:2;overflow-wrap:anywhere}
+.light #editor{background:#fafafa;color:#111}
+#editor:empty:before{content:"اینجا بنویس...";color:#777}
+#editor img{max-width:100%;height:auto;border-radius:8px}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.note{background:#25262c;padding:12px;border-radius:10px;margin:8px 0;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.light .note{background:#eee}
+.note span{overflow-wrap:anywhere}
+.hidden{display:none!important}
+#lockScreen{position:fixed;inset:0;background:#101114;z-index:99;display:flex;align-items:center;justify-content:center;padding:25px}
+#lockScreen>div{width:100%;max-width:350px;text-align:center}
+#lockScreen h1{font-size:38px;letter-spacing:4px}
+#msg{color:#ff7777}
+footer{text-align:center;color:#777;font-size:11px;margin:25px}
+@media print{
+ body{background:white!important;color:black!important;padding:0}
+ header,.no-print,footer,#lockScreen{display:none!important}
+ .panel{border:0!important;background:white!important;padding:0!important}
+ #editor{background:white!important;color:black!important;border:0!important;min-height:0}
+ #editor *{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+ #pdfTitle{display:block!important;font-size:22px}
+}
+</style>
+</head>
+
+<body>
+
+<div id="lockScreen">
+<div>
+<h1>HUZEYF</h1>
+<p style="color:#999">PRIVATE NOTES</p>
+<input id="passInput" type="password" placeholder="رمز عبور">
+<button style="width:100%" onclick="unlock()">ورود</button>
+<button style="width:100%;margin-top:8px" onclick="setupPassword()">ساخت رمز اولیه</button>
+<p id="msg"></p>
+</div>
+</div>
+
+<header>
+<div>
+<div class="logo">HUZEYF</div>
+<div class="small">MY PRIVATE SPACE</div>
+</div>
+<button onclick="toggleTheme()">◐ تغییر تم</button>
+</header>
+
+<section class="panel no-print">
+<h2>یادداشت جدید</h2>
+<input id="noteTitle" placeholder="عنوان نوشته">
+
+<select id="folder">
+<option>شخصی</option>
+<option>کارها</option>
+<option>مهم</option>
+<option>متفرقه</option>
+</select>
+
+<div class="toolbar">
+<button onclick="format('bold')"><b>B</b></button>
+<button onclick="format('italic')"><i>I</i></button>
+<button onclick="format('underline')"><u>U</u></button>
+<button onclick="format('insertUnorderedList')">لیست</button>
+<label style="background:#292a30;padding:7px;border-radius:9px">
+رنگ متن
+<input type="color" id="colorPicker" value="#ffffff" onchange="formatColor(this.value)" style="width:35px;padding:0;margin:0;vertical-align:middle">
+</label>
+</div>
+
+<div id="editor" contenteditable="true"></div>
+
+<div class="actions">
+<button onclick="saveNote()">ذخیره نوشته</button>
+<button onclick="newNote()">نوشته جدید</button>
+<button onclick="printPDF()">دریافت PDF</button>
+<button onclick="deleteNote()">حذف نوشته</button>
+</div>
+
+<div class="toolbar">
+<button onclick="document.getElementById('imageInput').click()">افزودن عکس</button>
+<button onclick="document.getElementById('fileInput').click()">افزودن فایل</button>
+<input type="file" id="imageInput" accept="image/*" hidden onchange="addFile(this)">
+<input type="file" id="fileInput" hidden onchange="addFile(this)">
+</div>
+<p class="small" id="status">ذخیره خودکار فعال است</p>
+</section>
+
+<section class="panel no-print" id="listPanel">
+<h2>نوشته‌های من</h2>
+<input id="search" placeholder="جست‌وجوی نوشته..." oninput="renderNotes()">
+<div id="notesList"></div>
+</section>
+
+<section class="panel no-print">
+<h2>تنظیمات و پشتیبان</h2>
+<div class="actions">
+<button onclick="backup()">دانلود پشتیبان</button>
+<button onclick="document.getElementById('backupInput').click()">بازیابی پشتیبان</button>
+<button onclick="changePassword()">تغییر رمز</button>
+<button onclick="lock()">قفل سایت</button>
+</div>
+<input type="file" id="backupInput" accept=".json" hidden onchange="restoreBackup(this)">
+</section>
+
+<footer>HUZEYF © 2026</footer>
+
+<script>
+const KEY='huzeyf_notes_v2';
+const PASS='huzeyf_pass_v2';
+const THEME='huzeyf_theme_v2';
+
+let notes=JSON.parse(localStorage.getItem(KEY)||'[]');
+let current=null;
+let unlocked=false;
+
+function saveData(){
+try{
+localStorage.setItem(KEY,JSON.stringify(notes));
+document.getElementById('status').textContent='✓ ذخیره شد';
+}catch(e){
+document.getElementById('status').textContent='فضای ذخیره پر شده؛ پشتیبان بگیرید';
+}
+}
+
+function setupPassword(){
+if(localStorage.getItem(PASS)){alert('رمز قبلاً ساخته شده');return}
+let p=document.getElementById('passInput').value;
+if(p.length<4){alert('رمز حداقل ۴ کاراکتر باشد');return}
+localStorage.setItem(PASS,p);
+unlock();
+}
+
+function unlock(){
+let p=document.getElementById('passInput').value;
+if(!localStorage.getItem(PASS)){
+document.getElementById('msg').textContent='ابتدا رمز اولیه بسازید';
+return;
+}
+if(p!==localStorage.getItem(PASS)){
+document.getElementById('msg').textContent='رمز اشتباه است';
+return;
+}
+unlocked=true;
+document.getElementById('lockScreen').classList.add('hidden');
+renderNotes();
+}
+
+function lock(){
+unlocked=false;
+document.getElementById('passInput').value='';
+document.getElementById('lockScreen').classList.remove('hidden');
+}
+
+function format(cmd){
+document.getElementById('editor').focus();
+document.execCommand(cmd,false,null);
+}
+
+function formatColor(c){
+document.getElementById('editor').focus();
+document.execCommand('styleWithCSS',false,true);
+document.execCommand('foreColor',false,c);
+}
+
+function newNote(){
+current=null;
+document.getElementById('noteTitle').value='';
+document.getElementById('editor').innerHTML='';
+document.getElementById('folder').selectedIndex=0;
+}
+
+function saveNote(){
+if(!unlocked)return;
+let title=document.getElementById('noteTitle').value.trim();
+let content=document.getElementById('editor').innerHTML;
+let folder=document.getElementById('folder').value;
+if(!title){alert('عنوان را وارد کن');return}
+if(!document.getElementById('editor').innerText.trim()){alert('متن خالی است');return}
+
+if(current){
+let n=notes.find(x=>x.id===current);
+if(n){n.title=title;n.content=content;n.folder=folder}
+}else{
+current=Date.now().toString();
+notes.unshift({id:current,title,content,folder});
+}
+saveData();
+renderNotes();
+}
+
+function openNote(id){
+let n=notes.find(x=>x.id===id);
+if(!n)return;
+current=id;
+document.getElementById('noteTitle').value=n.title;
+document.getElementById('editor').innerHTML=n.content;
+document.getElementById('folder').value=n.folder;
+window.scrollTo({top:0,behavior:'smooth'});
+}
+
+function deleteNote(){
+if(!current){alert('اول یک نوشته انتخاب کن');return}
+if(!confirm('نوشته حذف شود؟'))return;
+notes=notes.filter(x=>x.id!==current);
+saveData();
+newNote();
+renderNotes();
+}
+
+function renderNotes(){
+let q=document.getElementById('search').value.toLowerCase();
+let list=document.getElementById('notesList');
+list.innerHTML='';
+notes.filter(n=>(n.title+' '+n.content+' '+n.folder).toLowerCase().includes(q)).forEach(n=>{
+let div=document.createElement('div');
+div.className='note';
+let span=document.createElement('span');
+span.textContent=n.title+' | '+n.folder;
+let btn=document.createElement('button');
+btn.textContent='باز کردن';
+btn.onclick=()=>openNote(n.id);
+div.append(span,btn);
+list.appendChild(div);
+});
+}
+
+function printPDF(){
+if(!current){alert('اول نوشته را ذخیره و انتخاب کن');return}
+let n=notes.find(x=>x.id===current);
+if(!n)return;
+document.getElementById('pdfTitle').textContent=n.title;
+window.print();
+}
+
+function backup(){
+let blob=new Blob([JSON.stringify(notes,null,2)],{type:'application/json'});
+let url=URL.createObjectURL(blob);
+let a=document.createElement('a');
+a.href=url;
+a.download='HUZEYF-backup.json';
+a.click();
+URL.revokeObjectURL(url);
+}
+
+function restoreBackup(input){
+let file=input.files[0];
+if(!file)return;
+let reader=new FileReader();
+reader.onload=()=>{
+try{
+let data=JSON.parse(reader.result);
+if(!Array.isArray(data))throw Error();
+if(!confirm('نوشته‌های فعلی جایگزین شوند؟'))return;
+notes=data;
+saveData();
+renderNotes();
+alert('بازیابی شد');
+}catch(e){alert('فایل معتبر نیست')}
+};
+reader.readAsText(file);
+input.value='';
+}
+
+function changePassword(){
+if(prompt('رمز فعلی؟')!==localStorage.getItem(PASS)){alert('رمز اشتباه است');return}
+let p=prompt('رمز جدید؟');
+if(!p||p.length<4){alert('رمز حداقل ۴ کاراکتر باشد');return}
+localStorage.setItem(PASS,p);
+alert('رمز تغییر کرد');
+}
+
+function toggleTheme(){
+document.body.classList.toggle('light');
+localStorage.setItem(THEME,document.body.classList.contains('light')?'light':'dark');
+}
+
+function addFile(input){
+let file=input.files[0];
+if(!file)return;
+let reader=new FileReader();
+reader.onload=()=>{
+if(file.type.startsWith('image/')){
+let img=document.createElement('img');
+img.src=reader.result;
+img.alt=file.name;
+document.getElementById('editor').appendChild(img);
+}else{
+let a=document.createElement('a');
+a.href=reader.result;
+a.download=file.name;
+a.textContent='دانلود فایل: '+file.name;
+document.getElementById('editor').appendChild(a);
+}
+if(current)saveCurrentContent();
+};
+reader.readAsDataURL(file);
+input.value='';
+}
+
+function saveCurrentContent(){
+if(!current)return;
+let n=notes.find(x=>x.id===current);
+if(n){
+n.content=document.getElementById('editor').innerHTML;
+saveData();
+}
+}
+
+document.getElementById('editor').addEventListener('input',()=>{
+if(current){
+let n=notes.find(x=>x.id===current);
+if(n){
+n.title=document.getElementById('noteTitle').value;
+n.content=document.getElementById('editor').innerHTML;
+n.folder=document.getElementById('folder').value;
+saveData();
+}
+}
+});
+
+document.getElementById('pdfTitle').textContent='';
+
+if(localStorage.getItem(THEME)==='light')document.body.classList.add('light');
+renderNotes();
+</script>
+
+<h2 id="pdfTitle" style="display:none"></h2>
+
+</body>
+</html>
